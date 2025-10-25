@@ -4,6 +4,9 @@ import mongoose from "mongoose";
 import cors from "cors";
 import dotenv from "dotenv";
 import { connectDB } from "./config/database";
+import cookieParser from "cookie-parser";
+
+import authRoutes from "./routes/authRoutes";
 
 // Load env variables
 dotenv.config();
@@ -22,7 +25,13 @@ app.use(
   })
 );
 app.use(express.json());
-
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    credentials: true,
+  })
+);
+app.use(cookieParser());
 // Basic route
 app.get("/", (req, res) => {
   res.json({
@@ -31,7 +40,8 @@ app.get("/", (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
-
+// Routes
+app.use("/api/auth", authRoutes);
 // Health check route
 app.get("/health", (req, res) => {
   const dbStatus =
@@ -44,7 +54,20 @@ app.get("/health", (req, res) => {
     uptime: process.uptime(),
   });
 });
-
+app.use(
+  (
+    error: any,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
+    console.error("Unhandled error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+);
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
