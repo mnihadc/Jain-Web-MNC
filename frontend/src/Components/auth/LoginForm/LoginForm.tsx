@@ -1,7 +1,8 @@
-// src/components/auth/LoginForm/LoginForm.tsx
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import styled from "styled-components";
-import { FiLock, FiMail, FiEye, FiEyeOff } from "react-icons/fi";
+import { FiLock, FiMail, FiEye, FiEyeOff, FiAlertCircle } from "react-icons/fi";
 
 const FormContainer = styled.div`
   width: 100%;
@@ -152,9 +153,11 @@ const ForgotPassword = styled.a`
   }
 `;
 
-type UserRole = "student" | "teacher" | "admin" | "parent";
+type UserRole = "student" | "teacher" | "admin";
 
 const LoginForm: React.FC = () => {
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -165,6 +168,7 @@ const LoginForm: React.FC = () => {
   const [errors, setErrors] = useState<{ email?: string; password?: string }>(
     {}
   );
+  const [apiError, setApiError] = useState<string>("");
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -172,12 +176,18 @@ const LoginForm: React.FC = () => {
       ...prev,
       [name]: value,
     }));
-    // Clear error when user starts typing
+
+    // Clear errors when user types
     if (errors[name as keyof typeof errors]) {
       setErrors((prev) => ({
         ...prev,
         [name]: undefined,
       }));
+    }
+
+    // Clear API error
+    if (apiError) {
+      setApiError("");
     }
   };
 
@@ -186,6 +196,11 @@ const LoginForm: React.FC = () => {
       ...prev,
       role,
     }));
+
+    // Clear API error when changing role
+    if (apiError) {
+      setApiError("");
+    }
   };
 
   const validateForm = () => {
@@ -194,7 +209,7 @@ const LoginForm: React.FC = () => {
     if (!formData.email) {
       newErrors.email = "Email is required";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Email is invalid";
+      newErrors.email = "Please enter a valid email address";
     }
 
     if (!formData.password) {
@@ -215,17 +230,33 @@ const LoginForm: React.FC = () => {
     }
 
     setIsLoading(true);
+    setApiError("");
 
-    // Simulate API call
     try {
-      console.log("Login attempt:", formData);
-      // TODO: Replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      alert(`Login successful as ${formData.role}`);
-      // Redirect logic will be added later
-    } catch (error) {
+      // Direct API call to backend
+      const response = await axios.post(
+        "http://localhost:5000/api/auth/login",
+        formData,
+        {
+          withCredentials: true, // Important for cookies
+        }
+      );
+
+      console.log("Login successful:", response.data);
+
+      // Redirect based on role
+      navigate(`/${formData.role}/dashboard`);
+    } catch (error: any) {
       console.error("Login failed:", error);
-      alert("Login failed. Please try again.");
+
+      // Handle different error types
+      if (error.response?.data?.message) {
+        setApiError(error.response.data.message);
+      } else if (error.request) {
+        setApiError("Cannot connect to server. Please try again.");
+      } else {
+        setApiError("Login failed. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -235,6 +266,16 @@ const LoginForm: React.FC = () => {
     <FormContainer>
       <FormTitle>Welcome Back</FormTitle>
       <FormSubtitle>Sign in to your account</FormSubtitle>
+
+      {/* API Error Message */}
+      {apiError && (
+        <ErrorMessage
+          style={{ marginBottom: "1rem", justifyContent: "center" }}
+        >
+          <FiAlertCircle size={16} />
+          {apiError}
+        </ErrorMessage>
+      )}
 
       <Form onSubmit={handleSubmit}>
         <RoleSelector>
@@ -259,13 +300,6 @@ const LoginForm: React.FC = () => {
           >
             Admin
           </RoleButton>
-          <RoleButton
-            type="button"
-            $isSelected={formData.role === "parent"}
-            onClick={() => handleRoleChange("parent")}
-          >
-            Parent
-          </RoleButton>
         </RoleSelector>
 
         <InputGroup>
@@ -279,6 +313,7 @@ const LoginForm: React.FC = () => {
             value={formData.email}
             onChange={handleInputChange}
             $hasError={!!errors.email}
+            disabled={isLoading}
           />
           {errors.email && <ErrorMessage>{errors.email}</ErrorMessage>}
         </InputGroup>
@@ -294,10 +329,12 @@ const LoginForm: React.FC = () => {
             value={formData.password}
             onChange={handleInputChange}
             $hasError={!!errors.password}
+            disabled={isLoading}
           />
           <PasswordToggle
             type="button"
             onClick={() => setShowPassword(!showPassword)}
+            disabled={isLoading}
           >
             {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
           </PasswordToggle>
@@ -305,7 +342,14 @@ const LoginForm: React.FC = () => {
         </InputGroup>
 
         <SubmitButton type="submit" disabled={isLoading}>
-          {isLoading ? "Signing In..." : "Sign In"}
+          {isLoading ? (
+            <>
+              <Spinner />
+              Signing In...
+            </>
+          ) : (
+            "Sign In"
+          )}
         </SubmitButton>
 
         <ForgotPassword href="#">Forgot your password?</ForgotPassword>
@@ -313,5 +357,26 @@ const LoginForm: React.FC = () => {
     </FormContainer>
   );
 };
+
+// Add spinner component
+const Spinner = styled.div`
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 8px;
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+`;
 
 export default LoginForm;

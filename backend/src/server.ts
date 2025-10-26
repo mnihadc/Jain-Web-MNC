@@ -12,18 +12,11 @@ import authRoutes from "./routes/authRoutes";
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT;
 
 // Connect to MongoDB
 connectDB();
 
-// Middleware
-app.use(
-  cors({
-    origin: "http://localhost:5173", // Your React app URL
-    credentials: true,
-  })
-);
 app.use(express.json());
 app.use(
   cors({

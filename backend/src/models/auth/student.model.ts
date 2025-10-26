@@ -1,6 +1,5 @@
 // src/models/student.model.ts
 import mongoose, { Document, Schema } from "mongoose";
-import bcrypt from "bcryptjs";
 
 export interface IStudent extends Document {
   admissionId: string;
@@ -59,8 +58,6 @@ export interface IStudent extends Document {
   lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
-
-  comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
 const studentSchema = new Schema<IStudent>(
@@ -309,20 +306,6 @@ const studentSchema = new Schema<IStudent>(
     timestamps: true,
   }
 );
-
-// Hash password before saving
-studentSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
-
-  try {
-    const salt = await bcrypt.genSalt(12);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error: any) {
-    next(error);
-  }
-});
-
 // Auto-calculate age from date of birth
 studentSchema.pre("save", function (next) {
   if (this.personalInfo.dateOfBirth) {
@@ -343,12 +326,6 @@ studentSchema.pre("save", function (next) {
   next();
 });
 
-// Compare password method
-studentSchema.methods.comparePassword = async function (
-  candidatePassword: string
-): Promise<boolean> {
-  return await bcrypt.compare(candidatePassword, this.password);
-};
 
 // Indexes for performance
 studentSchema.index({ email: 1 });

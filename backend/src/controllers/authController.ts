@@ -4,6 +4,7 @@ import { Student } from "../models/auth/student.model";
 import { Teacher } from "../models/auth/teacher.model";
 import { Admin } from "../models/auth/admin.model";
 import { generateToken } from "../utils/generateToken";
+import bcrypt from "bcryptjs";
 import {
   LoginCredentials,
   AuthResponse,
@@ -18,9 +19,11 @@ export class AuthController {
   public static login = async (req: Request, res: Response): Promise<void> => {
     try {
       const { email, password, role }: LoginCredentials = req.body;
+      console.log("🔐 Login attempt:", { email, password: "***", role });
 
       // Validate required fields
       if (!email || !password || !role) {
+        console.log("❌ Missing required fields");
         res.status(400).json({
           success: false,
           message: "Email, password, and role are required",
@@ -31,6 +34,7 @@ export class AuthController {
       // Validate email format
       const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
       if (!emailRegex.test(email)) {
+        console.log("❌ Invalid email format");
         res.status(400).json({
           success: false,
           message: "Please provide a valid email address",
@@ -39,9 +43,11 @@ export class AuthController {
       }
 
       // Find user based on role
+      console.log(`🔍 Searching for ${role} with email: ${email}`);
       const user = await AuthController.findUserByRole(email, role);
 
       if (!user) {
+        console.log("❌ User not found in database");
         res.status(401).json({
           success: false,
           message: "Invalid credentials or user not found",
@@ -49,8 +55,13 @@ export class AuthController {
         return;
       }
 
+      console.log("✅ User found:", user._id);
+      console.log("👤 User active:", user.isActive);
+      console.log("🔑 User password hash:", user.password);
+
       // Check if user is active
       if (!user.isActive) {
+        console.log("❌ User account is deactivated");
         res.status(401).json({
           success: false,
           message: "Account is deactivated. Please contact administrator.",
@@ -58,15 +69,37 @@ export class AuthController {
         return;
       }
 
-      // Verify password
-      const isPasswordValid = await user.comparePassword(password);
+      // ✅ DIRECT BCRYPT COMPARISON IN CONTROLLER
+      console.log("🔄 Direct bcrypt comparison...");
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      console.log("🔑 Bcrypt comparison result:", isPasswordValid);
+
       if (!isPasswordValid) {
+        console.log("❌ Password invalid");
+
+        // Test with common passwords to find the right one
+        console.log("🧪 Testing common passwords...");
+        const testAdmin123 = await bcrypt.compare("admin123", user.password);
+        const testTest123 = await bcrypt.compare("test123", user.password);
+        const testPassword123 = await bcrypt.compare(
+          "password123",
+          user.password
+        );
+        const test123456 = await bcrypt.compare("123456", user.password);
+
+        console.log('🧪 Test "admin123":', testAdmin123);
+        console.log('🧪 Test "test123":', testTest123);
+        console.log('🧪 Test "password123":', testPassword123);
+        console.log('🧪 Test "123456":', test123456);
+
         res.status(401).json({
           success: false,
           message: "Invalid credentials",
         });
         return;
       }
+
+      console.log("✅ Password validation successful!");
 
       // Prepare user data for token and response
       const userData = AuthController.prepareUserData(user, role);
@@ -96,9 +129,10 @@ export class AuthController {
         user: userData,
       };
 
+      console.log("🎉 Login successful for:", userData.email);
       res.status(200).json(response);
     } catch (error) {
-      console.error("Login error:", error);
+      console.error("💥 Login error:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error. Please try again later.",
